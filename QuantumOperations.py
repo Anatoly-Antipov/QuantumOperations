@@ -3,11 +3,12 @@ import pennylane as q
 from sympy import Matrix
 import copy
 
-class ControlledOperations:
-    
-    #--------------------------------------------------------#
-    #--- Auxiliary functions without quantum computations ---#
-    #--------------------------------------------------------#
+
+#-------------------------------------#
+#--- Classical auxiliary functions ---#
+#-------------------------------------#
+
+class NonQuantumOperations:
     
     # prints out list of states in a computational basis
     def states_vector(self,wires):
@@ -208,7 +209,7 @@ class ControlledOperations:
                     decomposition_list.append(np.conj(V_list[i].T))
                 
                 # the last matrix V_n should be further decomposed - append result of the decomposition
-                deligated_task = self.Two_level_unitary_decomposition(np.conj(V_list[-1][1:U.shape[0]:1, 1:U.shape[0]:1].T))
+                deligated_task = NonQuantumOperations.Two_level_unitary_decomposition(self,np.conj(V_list[-1][1:U.shape[0]:1, 1:U.shape[0]:1].T))
                 for j in range(len(deligated_task)):
                     deligated_result = np.eye(U.shape[0],dtype='complex128')
                     deligated_result[1:U.shape[0]:1, 1:U.shape[0]:1] = deligated_task[j]
@@ -217,10 +218,11 @@ class ControlledOperations:
         return decomposition_list
         
     
-    
-    #-------------------------------------------#
-    #--- Functions with quantum computations ---#
-    #-------------------------------------------#
+#---------------------------------------------#
+#--- Functions impplementing quantum gates ---#
+#---------------------------------------------#
+
+class QuantumGates:
     
     # Note that wires should NOT be passed to QNode's function as an argument, since there are 2 problems:
     # 1. If type of wires in device is int and wires are passed as an argument for QNode's function, then wires[i].val type inside the function will be float => error 
@@ -273,7 +275,7 @@ class ControlledOperations:
         if len(control_wires) == 1:
             
             # get angles to use in Controlled_U_block
-            angles = self.ZY_decomposition_angles(U)
+            angles = NonQuantumOperations.ZY_decomposition_angles(self,U)
             alpha = angles['alpha']
             beta = angles['beta']
             gamma = angles['gamma']
@@ -287,7 +289,7 @@ class ControlledOperations:
         if len(control_wires) == 2:
             
             # get angles to use in Controlled_U_block
-            angles = self.ZY_decomposition_angles(self.matrix_power(U,1/2))
+            angles = NonQuantumOperations.ZY_decomposition_angles(self,NonQuantumOperations.matrix_power(self,U,1/2))
             alpha = angles['alpha']
             beta = angles['beta']
             gamma = angles['gamma']
@@ -310,7 +312,7 @@ class ControlledOperations:
         if len(control_wires) == 3:
             
             # get angles to use in Controlled_U_block
-            angles = self.ZY_decomposition_angles(self.matrix_power(U,1/4))
+            angles = NonQuantumOperations.ZY_decomposition_angles(self,NonQuantumOperations.matrix_power(self,U,1/4))
             alpha = angles['alpha']
             beta = angles['beta']
             gamma = angles['gamma']
@@ -351,7 +353,7 @@ class ControlledOperations:
         if len(control_wires) == 4:
             
             # get angles to use in Controlled_U_block
-            angles = self.ZY_decomposition_angles(self.matrix_power(U,1/8))
+            angles = NonQuantumOperations.ZY_decomposition_angles(self,NonQuantumOperations.matrix_power(self,U,1/8))
             alpha = angles['alpha']
             beta = angles['beta']
             gamma = angles['gamma']
@@ -430,7 +432,7 @@ class ControlledOperations:
         if len(control_wires) == 5:
             
             # get angles to use in Controlled_U_block
-            angles = self.ZY_decomposition_angles(self.matrix_power(U,1/16))
+            angles = NonQuantumOperations.ZY_decomposition_angles(self,NonQuantumOperations.matrix_power(U,1/16))
             alpha = angles['alpha']
             beta = angles['beta']
             gamma = angles['gamma']
@@ -613,7 +615,7 @@ class ControlledOperations:
                 q.PauliX(wires=wires[i])
     
     
-    # Implements Two_level_U given angles from ZY decomposition of U
+    # Implements Two_level_U given angles from ZY decomposition of U. building block for function U_n
     def Two_level_U(self,wires,U,non_trivial_indices):
         
         ### Transform U and non_trivial_indices
@@ -623,6 +625,9 @@ class ControlledOperations:
             for i in range(U.shape[0]):
                 for j in range(U.shape[0]):
                     U[i][j] = U[i][j].val
+        # non_trivial_indices should be list (otherwise, error is raised while executing U[np.ix_...])
+        if isinstance(non_trivial_indices, list) == False:
+            non_trivial_indices = list(non_trivial_indices)
         for i in range(len(non_trivial_indices)):
             if isinstance(non_trivial_indices[i], q.variable.Variable):
                 non_trivial_indices[i] = int(non_trivial_indices[i].val)
@@ -633,7 +638,7 @@ class ControlledOperations:
         # get Gray code
         a = bin(int(non_trivial_indices[0]))[2:]
         b = bin(int(non_trivial_indices[1]))[2:]
-        gray_code, changing_bit = self.Gray_code(a,b,len(wires))
+        gray_code, changing_bit = NonQuantumOperations.Gray_code(self,a,b,len(wires))
 
         # circuit
         # Gray code forward sequence of C_Xs
@@ -660,7 +665,7 @@ class ControlledOperations:
     
     
     # Arbitrary U circuit
-    def U_circuit(self, wires, U):
+    def U_n(self, wires, U):
         
         # check dimensionality of U
         if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
@@ -674,7 +679,7 @@ class ControlledOperations:
                 for j in range(U.shape[0]):
                     U[i][j] = U[i][j].val
         
-        Two_level_U_list = self.Two_level_unitary_decomposition(U)
+        Two_level_U_list = NonQuantumOperations.Two_level_unitary_decomposition(self,U)
         
         # consequentially execute Two_level_Us
         # note that circuits should be in reverse order relative to matrix decomposition 
@@ -685,13 +690,95 @@ class ControlledOperations:
             non_trivial_indices = np.where(np.sum(V_mask,axis=1) == 2)[0]
             # execute Two_level_U(V)
             self.Two_level_U(wires,V,non_trivial_indices)
+    
+    
+    # Implements Two_level_U given angles from ZY decomposition of U. Building block for function C_U_n
+    def controlled_Two_level_U(self,control_wire,operation_wires,U,non_trivial_indices):
         
+        ### Transform U and non_trivial_indices
+        # if U is passed as pennylane.Variable, then use type np.complex128
+        if isinstance(U[0][0], q.variable.Variable):
+            # no straight-forward't matrix-wise operation .val for ndarray of pennylane.Variables => use cycle
+            for i in range(U.shape[0]):
+                for j in range(U.shape[0]):
+                    U[i][j] = U[i][j].val
+        # non_trivial_indices should be list (otherwise, error is raised while executing U[np.ix_...])
+        if isinstance(non_trivial_indices, list) == False:
+            non_trivial_indices = list(non_trivial_indices)
+        for i in range(len(non_trivial_indices)):
+            if isinstance(non_trivial_indices[i], q.variable.Variable):
+                non_trivial_indices[i] = int(non_trivial_indices[i].val)
         
+        print(non_trivial_indices, end="\r")
+        U_non_trivial_submatrix = U[np.ix_(non_trivial_indices,non_trivial_indices)]
         
+        # get Gray code for U_n and then edit it to incorporate control_wire
+        a = bin(int(non_trivial_indices[0]))[2:]
+        b = bin(int(non_trivial_indices[1]))[2:]
+        gray_code, changing_bit = NonQuantumOperations.Gray_code(self,a,b,len(operation_wires))
+        # create wires = [operation_wires, control_wire] to execute the same operations with refined gray_code elements
+        wires = operation_wires + list([control_wire])
+        # edit gray_code element to incorporate control_wire =
+        # = add control_wire for every gray_code element as '1' in the end of code string
+        # note that since control_wire is the last in the list of wires, there is no need to edit changing_bit list
+        gray_code = [gray_code[i] + '1' for i in range(len(gray_code))]
         
+        # circuit
+        # Gray code forward sequence of C_Xs
+        for i in range(0,len(gray_code)-2):
+            self.gray_code_C_X(wires,gray_code[i],changing_bit[i])
+
+        # C_U
+        # flip qubit with PauliX if there is 0 in gray_code_element[-1] (but not the changing_bit)
+        for i in range(len(wires)):
+            if (gray_code[-1][i] == '0')&(i != changing_bit[-1]):
+                q.PauliX(wires=wires[i])
+        # define control_wires and operation_wire
+        control_wires = copy.deepcopy(wires)
+        del control_wires[changing_bit[-1]]
+        self.C_U(U_non_trivial_submatrix,control_wires=control_wires, operation_wire=wires[changing_bit[-1]])
+        # flip qubit with PauliX if there is 0 in gray_code_element[-1] (but not the changing_bit)
+        for i in range(len(wires)):
+            if (gray_code[-1][i] == '0')&(i != changing_bit[-1]):
+                q.PauliX(wires=wires[i])
+
+        # Gray code backward sequence of C_Xs
+        for i in range(len(gray_code)-3,-1,-1):
+            self.gray_code_C_X(wires,gray_code[i],changing_bit[i])
+    
+    
+    # controlled n-qubit unitary U (one control wire, n operation wires)
+    def C_U_n(self, control_wire, operation_wires, U):
         
+        # check dimensionality of U
+        if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
+            raise Exception('Wrong shape of U: it should be 2**len(operation_wires)')
         
+        ### Transform U and non_trivial_indices
+        # if U is passed as pennylane.Variable, then use type np.complex128
+        if isinstance(U[0][0], q.variable.Variable):
+            # no straight-forward't matrix-wise operation .val for ndarray of pennylane.Variables => use cycle
+            for i in range(U.shape[0]):
+                for j in range(U.shape[0]):
+                    U[i][j] = U[i][j].val
         
+        Two_level_U_list = NonQuantumOperations.Two_level_unitary_decomposition(self,U)
         
-        
-        
+        # consequentially execute controlled_Two_level_Us
+        # note that circuits should be in reverse order relative to matrix decomposition 
+        I = np.eye(U.shape[0],dtype='complex128')
+        for V in reversed(Two_level_U_list):
+            # get non-trivial indices
+            V_mask = np.isclose(V, I,atol=1e-15) == False
+            non_trivial_indices = np.where(np.sum(V_mask,axis=1) == 2)[0]
+            # execute controlled_Two_level_U(V)
+            self.controlled_Two_level_U(control_wire,operation_wires,V,non_trivial_indices)
+    
+#-------------------------------------------------#
+#--- Functions implementing quantum algorithms ---#
+#-------------------------------------------------#
+
+class QuantumAlgorithms:
+    
+    def QFT(self):
+        print('function will be here soon')
