@@ -259,11 +259,60 @@ class QuantumGates:
     # 1. If type of wires in device is int and wires are passed as an argument for QNode's function, then wires[i].val type inside the function will be float => error 
     # 2. If type of wires in device is str, then passing str type as an argument for QNode's function will raise error
     
+    
+    # Implements T_dagger (conjugate transform of T)
+    def T_dagger(self,wires):
+        q.S(wires=wires)
+        q.S(wires=wires)
+        q.S(wires=wires)
+        q.T(wires=wires)
+
+    
     # Implements standard 2-wires SWAP-gate
     def SWAP(self,wires):
         q.CNOT(wires=[wires[0],wires[1]])
         q.CNOT(wires=[wires[1],wires[0]])
         q.CNOT(wires=[wires[0],wires[1]])
+    
+    
+    # Implements Toffoli gate using Hadamard, phase, controlled-NOT and π/8 gates (Nielsen, Chuang)
+    def Toffoli(self,wires):
+        q.Hadamard(wires=wires[2])
+        q.CNOT(wires=[wires[1],wires[2]])
+        QuantumGates.T_dagger(self,wires=wires[2])
+        q.CNOT(wires=[wires[0],wires[2]])
+        q.T(wires=wires[2])
+        q.CNOT(wires=[wires[1],wires[2]])
+        QuantumGates.T_dagger(self,wires=wires[2])
+        q.CNOT(wires=[wires[0],wires[2]])
+        QuantumGates.T_dagger(self,wires=wires[1])
+        q.T(wires=wires[2])
+        q.Hadamard(wires=wires[2])
+        q.CNOT(wires=[wires[0],wires[1]])
+        QuantumGates.T_dagger(self,wires=wires[1])
+        q.CNOT(wires=[wires[0],wires[1]])
+        q.T(wires=wires[0])
+        q.S(wires=wires[1])
+        
+    
+    # Implements 4-wires carry operation used for ADDER
+    # setup: wires[0] = c_i, wires[1] = a_i, wires[2] = b_i, wires[3] = c_(i+1) = |0>
+    # operation carries |1> in wires[3] = c_(i+1) if c_i + a_i + b_i > 1
+    # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
+    def CARRY(self,wires):
+        QuantumGates.Toffoli(self,wires=wires[1:])
+        q.CNOT(wires=[wires[1],wires[2]])
+        QuantumGates.Toffoli(self,wires=[wires[0],wires[2],wires[3]])
+        
+    
+    # Implements 3-wires carry operation used for ADDER
+    # setup: wires[0] = a, wires[1] = b, wires[2] = |0>
+    # operation makes wires[2] = a+b mod 2
+    # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
+    def SUM(self,wires):
+        q.CNOT(wires=[wires[1],wires[2]])
+        q.CNOT(wires=[wires[0],wires[2]])
+    
     
     # C_1_U block for 2x2 U to be inserted into the main circuit
     # Implements controlled-U given angles from ZY-decomposition of U
@@ -820,6 +869,32 @@ class QuantumGates:
 #-------------------------------------------------#
 
 class QuantumAlgorithms:
+    
+    # Implements |a,b> -> |a,a+b> for binary representation of a and b
+    # setup: algorithm uses 3 registers - register with prepared a, register with prepared b and register with auxiliary 0s
+    # n wires for the register with a (wires_a)
+    # n+1 wires for the register with b (wires_b)
+    # n wires for the auxiliary register with c (wires_c)
+    # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
+    def ADDER(wires_a,wires_b,wires_c):
+        
+        # check inputs
+        if ( (len(wires_a) == len(wires_c))&(len(wires_a)+1 == len(wires_b))== False ):
+            raise Exception('Wrong number of wires: should be n wires for wires_a, n+1 wires for wires_b and n wires for wires_c')
+        
+        # block of CARRY gates
+        for i in range(len(wires_a)-1):
+            QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
+        QuantumGates.CARRY(self,[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1],wires_b[len(wires_a)]])
+        
+        q.CNOT(wires=[wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
+        
+        # block of CARRY and SUM gates
+        QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
+        for i in range(len(wires_a)-2,-1,-1):
+            QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
+            QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]])
+    
     
     # Implements Quantum Fourier transform. 
     # If inverse == True, then the function implements inverse Quantum Fourier transform
