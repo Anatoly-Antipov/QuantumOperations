@@ -31,7 +31,7 @@ class ClassicalOperations:
     
     
     def get_non_trivial_indices(self,Two_level_U_list):
-        # due to algorithmic structure of decomposition, non_trivial_indices are known in advance
+        # due to algorithmic structure of the two-level unitary decomposition, non_trivial_indices are known in advance
         non_trivial_indices_list = list()
         k = 0
         matrix_size = Two_level_U_list[0].shape[0]
@@ -266,13 +266,6 @@ class QuantumGates:
         q.S(wires=wires)
         q.S(wires=wires)
         q.T(wires=wires)
-
-    
-    # Implements standard 2-wires SWAP-gate
-    def SWAP(self,wires):
-        q.CNOT(wires=[wires[0],wires[1]])
-        q.CNOT(wires=[wires[1],wires[0]])
-        q.CNOT(wires=[wires[0],wires[1]])
     
     
     # Implements Toffoli gate using Hadamard, phase, controlled-NOT and π/8 gates (Nielsen, Chuang)
@@ -293,25 +286,101 @@ class QuantumGates:
         q.CNOT(wires=[wires[0],wires[1]])
         q.T(wires=wires[0])
         q.S(wires=wires[1])
+    
+    
+    # Implements Toffoli gate with 3 controls instead of 2
+    # requires 1 work qubit
+    def Controlled_Toffoli(self,control_wires,operation_wire,work_wire):
+        QuantumGates.Toffoli(self,wires=[control_wires[0],control_wires[1],work_wire])
+        QuantumGates.Toffoli(self,wires=[control_wires[2],work_wire,operation_wire])
+        QuantumGates.Toffoli(self,wires=[control_wires[0],control_wires[1],work_wire])
+    
+    
+    # Implements standard 2-wires SWAP-gate
+    def SWAP(self,wires):
+        q.CNOT(wires=[wires[0],wires[1]])
+        q.CNOT(wires=[wires[1],wires[0]])
+        q.CNOT(wires=[wires[0],wires[1]])
+    
+    
+    # Implements 2-wires SWAP conditional on 1-wire control
+    def Controlled_SWAP(self,control_wire,swap_wires):
+        QuantumGates.Toffoli(self,wires=[control_wire,swap_wires[0],swap_wires[1]])
+        QuantumGates.Toffoli(self,wires=[control_wire,swap_wires[1],swap_wires[0]])
+        QuantumGates.Toffoli(self,wires=[control_wire,swap_wires[0],swap_wires[1]])
+    
+    
+    # Implements 2-wires SWAP conditional on 2-wires controls
+    # requires 1 work qubit, because it uses controlled_Toffoli
+    def Controlled_Controlled_SWAP(self,control_wires,swap_wires,work_wire):
+        QuantumGates.Controlled_Toffoli(self,control_wires=[control_wires[0],control_wires[1],swap_wires[0]],operation_wire=swap_wires[1],work_wire=work_wire)
+        QuantumGates.Controlled_Toffoli(self,control_wires=[control_wires[0],control_wires[1],swap_wires[1]],operation_wire=swap_wires[0],work_wire=work_wire)
+        QuantumGates.Controlled_Toffoli(self,control_wires=[control_wires[0],control_wires[1],swap_wires[0]],operation_wire=swap_wires[1],work_wire=work_wire)
+    
+    
+    # Implements SWAP for 2 n-wires register conditional on 1-wire control
+    def Controlled_register_SWAP(self,control_wire,wires_register_1,wires_register_2):
         
+        # check inputs
+        if ( (isinstance(control_wire, list) == False)&(len(wires_register_1) == len(wires_register_2)) == False):
+            raise Exception('Wrong number of wires: should be 1 wire for control_wire, n wires for wires_register_1 and n wires for wires_register_2')
+        
+        # circuit
+        for i in range(len(wires_register_1)):
+            QuantumGates.Controlled_SWAP(self,control_wire=control_wire,swap_wires=[wires_register_1[i],wires_register_2[i]])
+    
+    
+    # Implements resetting register with zeros to binary representation of classicaly known number N conditional on 1-wire control
+    # if control == 1, then resulting values in the wires_zero_register are [N_0, N_1, ... , N_(n-1)], where N = N_(n-1)*2^(n-1) + ... + N_1*2^1 + N_0*2^0
+    def Controlled_reset_zero_register_to_N(self,control_wire,wires_zero_register,N):
+        
+        # check N
+        # format
+        if isinstance(N, q.variable.Variable):
+            N = N.val
+        # check if N does not match the size of wires_zero_register
+        if N > 2**(len(wires_zero_register))-1:
+            raise Exception('N is too big for the register wires_zero_register')
+        # make a string with a binary represenatation of N (in reverse order)
+        N = bin(N)[2:][::-1]
+        # add zeros to match the register's size
+        N = N + '0'*(len(wires_zero_register)-len(N))
+        
+        # check other inputs
+        if (isinstance(control_wire, list)):
+            raise Exception('control_wire should not be a list')
+        
+        # circuit of CNOTs with control=control_wire and taget - wire in wires_zero_register, for which N == '1'
+        for i in range(len(wires_zero_register)):
+            if N[i] == '1':
+                q.CNOT(wires=[control_wire,wires_zero_register[i]])
+    
     
     # Implements 4-wires carry operation used for ADDER
     # setup: wires[0] = c_i, wires[1] = a_i, wires[2] = b_i, wires[3] = c_(i+1) = |0>
     # operation carries |1> in wires[3] = c_(i+1) if c_i + a_i + b_i > 1
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def CARRY(self,wires):
-        QuantumGates.Toffoli(self,wires=wires[1:])
-        q.CNOT(wires=[wires[1],wires[2]])
-        QuantumGates.Toffoli(self,wires=[wires[0],wires[2],wires[3]])
-        
+    def CARRY(self,wires,reverse=False):
+        if reverse == False:
+            QuantumGates.Toffoli(self,wires=wires[1:])
+            q.CNOT(wires=[wires[1],wires[2]])
+            QuantumGates.Toffoli(self,wires=[wires[0],wires[2],wires[3]])
+        else:
+            QuantumGates.Toffoli(self,wires=[wires[0],wires[2],wires[3]])
+            q.CNOT(wires=[wires[1],wires[2]])
+            QuantumGates.Toffoli(self,wires=wires[1:])
     
     # Implements 3-wires carry operation used for ADDER
     # setup: wires[0] = a, wires[1] = b, wires[2] = |0>
     # operation makes wires[2] = a+b mod 2
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def SUM(self,wires):
-        q.CNOT(wires=[wires[1],wires[2]])
-        q.CNOT(wires=[wires[0],wires[2]])
+    def SUM(self,wires,reverse=False):
+        if reverse == False:
+            q.CNOT(wires=[wires[1],wires[2]])
+            q.CNOT(wires=[wires[0],wires[2]])
+        else:
+            q.CNOT(wires=[wires[0],wires[2]])
+            q.CNOT(wires=[wires[1],wires[2]])
     
     
     # C_1_U block for 2x2 U to be inserted into the main circuit
@@ -876,24 +945,110 @@ class QuantumAlgorithms:
     # n+1 wires for the register with b (wires_b)
     # n wires for the auxiliary register with c (wires_c)
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def ADDER(wires_a,wires_b,wires_c):
+    def ADDER(self,wires_a,wires_b,wires_c,reverse=False):
         
         # check inputs
         if ( (len(wires_a) == len(wires_c))&(len(wires_a)+1 == len(wires_b))== False ):
             raise Exception('Wrong number of wires: should be n wires for wires_a, n+1 wires for wires_b and n wires for wires_c')
         
-        # block of CARRY gates
-        for i in range(len(wires_a)-1):
-            QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
-        QuantumGates.CARRY(self,[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1],wires_b[len(wires_a)]])
+        # circuit
+        if reverse == False:
+            # block of CARRY gates
+            for i in range(len(wires_a)-1):
+                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
+            QuantumGates.CARRY(self,[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1],wires_b[len(wires_a)]])
+
+            q.CNOT(wires=[wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
+
+            # block of reverse-CARRY and SUM gates
+            QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
+            for i in range(len(wires_a)-2,-1,-1):
+                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]],reverse=True)
+                QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]])
+        else:
+            # block of reverse-SUM and CARRY gates
+            for i in range(len(wires_a)-1):
+                QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]],reverse=True)
+                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
+            QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]],reverse=True)
+            
+            q.CNOT(wires=[wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
+            
+            # block of reverse-CARRY gates
+            QuantumGates.CARRY(self,[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1],wires_b[len(wires_a)]],reverse=True)
+            for i in range(len(wires_a)-2,-1,-1):
+                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]],reverse=True)
+    
+    
+    # Implements |a,b> -> |a,a+b mod N> for binary representation of a and b
+    # If reverse == True, implements |a,b> -> |a,b-a mod N> for binary representation of a and b
+    # setup: algorithm uses 5 registers - register with prepared a, register with prepared b, register with prpared N and register t with auxiliary |0>
+    # n wires for the register with a (wires_a)
+    # n+1 wires for the register with b (wires_b)
+    # n wires for the register with c (wires_c) for ADDERs
+    # n wires for the register with N (wires_N)
+    # n wires for the register with |0...0> (wires_swap_0)
+    # 1 wire for the register with t=|0> (wires_t)
+    # Note that it works correctly only for 0 <= a,b < N
+    # Note that it seems like register t might be equal to |1> for a,b and N which are not 0 <= a,b < N
+    # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
+    def ADDER_MOD(self,wires_a,wires_b,wires_c,wires_N,wires_t,N,reverse=False):
         
-        q.CNOT(wires=[wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
+        # check inputs
+        # is it true that wires_a == wires_N ???
+        if ( (len(wires_a)+1 == len(wires_b))&(len(wires_a) == len(wires_c))&(len(wires_a) == len(wires_N))&(isinstance(wires_t, list) == False)== False ):
+            raise Exception('Wrong number of wires: should be n wires for wires_a, n+1 wires for wires_b, n wires for wires_c, n wires for wires_N and 1 wire for wires_t')
         
-        # block of CARRY and SUM gates
-        QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
-        for i in range(len(wires_a)-2,-1,-1):
-            QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
-            QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]])
+        # circuit
+        if reverse == False:
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c)
+            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c,reverse=True)
+            
+            q.PauliX(wires=wires_b[-1])
+            q.CNOT(wires=[wires_b[-1],wires_t])
+            q.PauliX(wires=wires_b[-1])
+            
+            QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
+            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c)
+            QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
+            
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,reverse=True)
+            q.CNOT(wires=[wires_b[-1],wires_t])
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c)
+        else:
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,reverse=True)
+            q.CNOT(wires=[wires_b[-1],wires_t])
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c)
+            
+            QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
+            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c,reverse=True)
+            QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
+            
+            q.PauliX(wires=wires_b[-1])
+            q.CNOT(wires=[wires_b[-1],wires_t])
+            q.PauliX(wires=wires_b[-1])
+            
+            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c)
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,reverse=True)
+    
+    
+    # Implements |a,b> -> |a,a+b mod N> for binary representation of a and b
+    # If reverse == True, implements |a,b> -> |a,b-a mod N> for binary representation of a and b
+    # setup: algorithm uses 5 registers - register with prepared a, register with prepared b, register with prpared N and register t with auxiliary |0>
+    # n wires for the register with a (wires_a)
+    # n+1 wires for the register with b (wires_b)
+    # n wires for the register with c (wires_c)
+    # n wires for the register with N (wires_N)
+    # n wires for the register with |0...0> (wires_swap_0)
+    # 1 wire for the register with t=|0> (wires_t)
+    # Note that it works correctly only for 0 <= a,b < N
+    # Note that it seems like register t might be equal to |1> for a,b and N which are not 0 <= a,b < N
+    # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
+#     def Controlled_MULT_MOD(self,wires_a,wires_b,wires_c,wires_N,wires_swap_0,wires_t,reverse=False):
+        
+        
+        
+    
     
     
     # Implements Quantum Fourier transform. 
