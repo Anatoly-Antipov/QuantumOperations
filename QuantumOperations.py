@@ -965,27 +965,6 @@ class QuantumGates:
             QuantumGates.gray_code_C_X(self,gray_code[i],changing_bit[i],wires)
     
     
-    # Arbitrary U circuit
-    def U_n(self, U, wires):
-        
-        # check dimensionality of U
-        if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
-            raise Exception('Wrong shape of U: it should be 2**len(wires)')
-        
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
-        
-        # get Two_level_U_list and non_trivial_indices of any matrix in the list
-        Two_level_U_list = ClassicalOperations.Two_level_unitary_decomposition(self,U)
-        decomposition_pairs_list = ClassicalOperations.get_non_trivial_indices(self,Two_level_U_list)
-        
-        # consequentially execute Two_level_Us
-        # note that circuits should be in reverse order relative to matrix decomposition
-        for decomposition_pair in reversed(decomposition_pairs_list):
-            # execute Two_level_U
-            QuantumGates.Two_level_U(self,wires=wires,U=decomposition_pair[0],non_trivial_indices=decomposition_pair[1])
-    
-    
     # Implements Two_level_U given angles from ZY decomposition of U. Building block for function C_U_n
     def controlled_Two_level_U(self,U,non_trivial_indices,control_wire,operation_wires):
         
@@ -1061,6 +1040,28 @@ class QuantumGates:
 #-------------------------------------------------#
 
 class QuantumAlgorithms:
+    
+    
+    # Arbitrary U circuit
+    def U_n(self, U, wires):
+        
+        # check dimensionality of U
+        if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
+            raise Exception('Wrong shape of U: it should be 2**len(wires)')
+        
+        ### Transform U
+        U = ClassicalOperations.check_matrix(self,U)
+        
+        # get Two_level_U_list and non_trivial_indices of any matrix in the list
+        Two_level_U_list = ClassicalOperations.Two_level_unitary_decomposition(self,U)
+        decomposition_pairs_list = ClassicalOperations.get_non_trivial_indices(self,Two_level_U_list)
+        
+        # consequentially execute Two_level_Us
+        # note that circuits should be in reverse order relative to matrix decomposition
+        for decomposition_pair in reversed(decomposition_pairs_list):
+            # execute Two_level_U
+            QuantumGates.Two_level_U(self,wires=wires,U=decomposition_pair[0],non_trivial_indices=decomposition_pair[1])
+    
     
     # Implements |a,b> -> |a,a+b> for binary representation of a and b
     # setup: algorithm uses 3 registers - register with prepared a, register with prepared b and register with auxiliary 0s
