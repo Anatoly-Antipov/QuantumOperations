@@ -30,6 +30,26 @@ class ClassicalOperations:
         return states_vector
     
     
+    # returns np.array with bitwise binary representation of a given number
+    # if option reverse=True reverses array so that the first bit is for 2^0 and the last is for 2^(k-1)
+    # if option bits is set to a number, then the length of resulting array is bits.
+    def int_to_binary_array(self,n,reverse=False,bits=False):
+        if bits == False:
+            if reverse == False:
+                return np.array([int(i) for i in bin(n)[2:]])
+            else:
+                return np.array([int(i) for i in bin(n)[2:][::-1]])
+        else:
+            if reverse == False:
+                bin_repr = bin(n)[2:]
+                bin_repr = '0'*(bits-len(bin_repr)) + bin_repr
+                return np.array([int(i) for i in bin_repr])
+            else:
+                bin_repr = bin(n)[2:][::-1]
+                bin_repr = bin_repr + '0'*(bits-len(bin_repr))
+                return np.array([int(i) for i in bin_repr])
+    
+    
     def get_non_trivial_indices(self,Two_level_U_list):
         # due to algorithmic structure of the two-level unitary decomposition, non_trivial_indices are known in advance
         non_trivial_indices_list = list()
@@ -62,7 +82,109 @@ class ClassicalOperations:
                 changing_bit.append(i)
 
         return [gray_code, changing_bit]
+    
+    
+    # Euclid's algorithm - finds greater common devider
+    # Note: doesn't work correctly for too big numbers (because a%b and int(a/b) do not work)
+    def gcd(self,a,b):
+        ## check
+        # format
+        if isinstance(a, q.variable.Variable):
+            a = a.val# format
+        if isinstance(b, q.variable.Variable):
+            b = b.val
+        # order
+        if a < b:
+            a,b = b,a
+        
+        
+        ## algorithm
+        r = a%b
+        if r == 0:
+            return b
+        else:
+            return ClassicalOperations.gcd(self,b,r)
+    
+    
+    # Auxiliary recursive function for finding alpha and beta in r_n = alpha*a + beta*b, where n: r_n = gcd(a,b)
+    # algorithm should be initialized with alpha = 1, beta = -k_(n-2), i = n-2
+    # before algorithms' execution, array of k should be defined
+    # i denotes level in Euclid's algorithm
+    # algorithm should be initialized with alpha = 1, beta = -k_(n-2), i = n-2, where n: r_n = gcd(a,b)
+    # Note: doesn't work correctly for too big numbers (because a%b and int(a/b) do not work)
+    def diophantine_equation_auxiliary(self,k_list,alpha,beta,i):
+        
+        if i != 1:
+            return ClassicalOperations.diophantine_equation_auxiliary(self,k_list=k_list,alpha=beta,beta=alpha-beta*k_list[i-2],i=i-1)
+        else:
+            return [alpha,beta]
+    
+    
+    # solves diophantine equation, i.e. given a,b returns x,y such that ax + by = gcd(a,b)
+    # Euclid's algorithm produces set of values (k_i,r_i), where r_i = k_i*r_(i+1) + r_(i+2), i goes from 0 to n
+    def diophantine_equation(self,a,b):
+        
+        ## check
+        # format
+        if isinstance(a, q.variable.Variable):
+            a = a.val# format
+        if isinstance(b, q.variable.Variable):
+            b = b.val
+        # order
+        flag = 0
+        if a < b:
+            a,b = b,a
+            flag = 1
+        
+        # if b == gcd(a,b)
+        if b == ClassicalOperations.gcd(self,a,b):
+            if flag == 0:
+                return [0,1]
+            if flag == 1:
+                return [1,0]
+            
+        # initialize r and lists of r and k from the equation a = kb + r
+        r_list = list([a])
+        k_list = list()
 
+        # forward part of the algorithm (Nielsen Chuang p.628)
+        while b!=0:
+            r_list.append(b)
+            k_list.append(int(a/b))
+            a,b = b,a%b
+        
+        # backward part of the algorithm (Nielsen Chuang p. 629)
+        if flag == 0:
+            return ClassicalOperations.diophantine_equation_auxiliary(self,k_list=k_list,alpha=1,beta=-k_list[-2],i=len(r_list)-2)
+        if flag == 1:
+            return ClassicalOperations.diophantine_equation_auxiliary(self,k_list=k_list,alpha=1,beta=-k_list[-2],i=len(r_list)-2)[::-1]
+    
+    
+    # finds modular multiplicative inverse using diophantine_equation
+    def modular_multiplicative_inverse(self,a,N):
+        
+        ## check
+        # format
+        if isinstance(a, q.variable.Variable):
+            a = a.val# format
+        if isinstance(N, q.variable.Variable):
+            N = N.val
+        # co-primality
+        if ClassicalOperations.gcd(self,a,N) != 1:
+            raise Exception('a and N should be co-prime, i.e. gcd(a,N) should be 1')
+#         if a >= N:
+#             raise Exception('a should be less than N - check that order of arguments of the function is right')
+        
+        ## algorithm
+        # get inverse
+        inverse = ClassicalOperations.diophantine_equation(self,a=a,b=N)[0]
+        
+        # make inverse positive if necessary
+        if inverse < 0:
+            inverse = inverse%N
+        
+        return inverse
+    
     
     # 2x2 matrix to the custom power
     def matrix_power(self, U, power=1/2):
@@ -250,7 +372,7 @@ class ClassicalOperations:
         
     
 #---------------------------------------------#
-#--- Functions impplementing quantum gates ---#
+#--- Functions implementing quantum gates ---#
 #---------------------------------------------#
 
 class QuantumGates:
@@ -350,7 +472,8 @@ class QuantumGates:
         if (isinstance(control_wire, list)):
             raise Exception('control_wire should not be a list')
         
-        # circuit of CNOTs with control=control_wire and taget - wire in wires_zero_register, for which N == '1'
+        # circuit
+        # CNOTs with control=control_wire and taget - wire in wires_zero_register, for which N == '1'
         for i in range(len(wires_zero_register)):
             if N[i] == '1':
                 q.CNOT(wires=[control_wire,wires_zero_register[i]])
@@ -360,8 +483,8 @@ class QuantumGates:
     # setup: wires[0] = c_i, wires[1] = a_i, wires[2] = b_i, wires[3] = c_(i+1) = |0>
     # operation carries |1> in wires[3] = c_(i+1) if c_i + a_i + b_i > 1
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def CARRY(self,wires,reverse=False):
-        if reverse == False:
+    def CARRY(self,wires,inverse=False):
+        if inverse == False:
             QuantumGates.Toffoli(self,wires=wires[1:])
             q.CNOT(wires=[wires[1],wires[2]])
             QuantumGates.Toffoli(self,wires=[wires[0],wires[2],wires[3]])
@@ -374,8 +497,8 @@ class QuantumGates:
     # setup: wires[0] = a, wires[1] = b, wires[2] = |0>
     # operation makes wires[2] = a+b mod 2
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def SUM(self,wires,reverse=False):
-        if reverse == False:
+    def SUM(self,wires,inverse=False):
+        if inverse == False:
             q.CNOT(wires=[wires[1],wires[2]])
             q.CNOT(wires=[wires[0],wires[2]])
         else:
@@ -945,14 +1068,14 @@ class QuantumAlgorithms:
     # n+1 wires for the register with b (wires_b)
     # n wires for the auxiliary register with c (wires_c)
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def ADDER(self,wires_a,wires_b,wires_c,reverse=False):
+    def ADDER(self,wires_a,wires_b,wires_c,inverse=False):
         
         # check inputs
         if ( (len(wires_a) == len(wires_c))&(len(wires_a)+1 == len(wires_b))== False ):
             raise Exception('Wrong number of wires: should be n wires for wires_a, n+1 wires for wires_b and n wires for wires_c')
         
         # circuit
-        if reverse == False:
+        if inverse == False:
             # block of CARRY gates
             for i in range(len(wires_a)-1):
                 QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
@@ -960,39 +1083,39 @@ class QuantumAlgorithms:
 
             q.CNOT(wires=[wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
 
-            # block of reverse-CARRY and SUM gates
+            # block of inverse-CARRY and SUM gates
             QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
             for i in range(len(wires_a)-2,-1,-1):
-                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]],reverse=True)
+                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]],inverse=True)
                 QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]])
         else:
-            # block of reverse-SUM and CARRY gates
+            # block of inverse-SUM and CARRY gates
             for i in range(len(wires_a)-1):
-                QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]],reverse=True)
+                QuantumGates.SUM(self,[wires_c[i],wires_a[i],wires_b[i]],inverse=True)
                 QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]])
-            QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]],reverse=True)
+            QuantumGates.SUM(self,wires=[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]],inverse=True)
             
             q.CNOT(wires=[wires_a[len(wires_a)-1],wires_b[len(wires_a)-1]])
             
-            # block of reverse-CARRY gates
-            QuantumGates.CARRY(self,[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1],wires_b[len(wires_a)]],reverse=True)
+            # block of inverse-CARRY gates
+            QuantumGates.CARRY(self,[wires_c[len(wires_a)-1],wires_a[len(wires_a)-1],wires_b[len(wires_a)-1],wires_b[len(wires_a)]],inverse=True)
             for i in range(len(wires_a)-2,-1,-1):
-                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]],reverse=True)
+                QuantumGates.CARRY(self,[wires_c[i],wires_a[i],wires_b[i],wires_c[i+1]],inverse=True)
     
     
     # Implements |a,b> -> |a,a+b mod N> for binary representation of a and b
-    # If reverse == True, implements |a,b> -> |a,b-a mod N> for binary representation of a and b
-    # setup: algorithm uses 5 registers - register with prepared a, register with prepared b, register with prpared N and register t with auxiliary |0>
+    # N is classicaly known
+    # If inverse == True, implements |a,b> -> |a,b-a mod N> for binary representation of a and b
+    # setup: algorithm uses 5 registers - register with prepared a, register with prepared b, register with prpared N, register with prepared |0..0> for input c into ADDERs and register t with auxiliary |0>
     # n wires for the register with a (wires_a)
     # n+1 wires for the register with b (wires_b)
-    # n wires for the register with c (wires_c) for ADDERs
+    # n wires for the register with |0...0> (wires_c) for ADDERs
     # n wires for the register with N (wires_N)
-    # n wires for the register with |0...0> (wires_swap_0)
     # 1 wire for the register with t=|0> (wires_t)
     # Note that it works correctly only for 0 <= a,b < N
     # Note that it seems like register t might be equal to |1> for a,b and N which are not 0 <= a,b < N
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-    def ADDER_MOD(self,wires_a,wires_b,wires_c,wires_N,wires_t,N,reverse=False):
+    def ADDER_MOD(self,wires_a,wires_b,wires_c,wires_N,wires_t,N,inverse=False):
         
         # check inputs
         # is it true that wires_a == wires_N ???
@@ -1000,9 +1123,9 @@ class QuantumAlgorithms:
             raise Exception('Wrong number of wires: should be n wires for wires_a, n+1 wires for wires_b, n wires for wires_c, n wires for wires_N and 1 wire for wires_t')
         
         # circuit
-        if reverse == False:
+        if inverse == False:
             QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c)
-            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c,reverse=True)
+            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c,inverse=True)
             
             q.PauliX(wires=wires_b[-1])
             q.CNOT(wires=[wires_b[-1],wires_t])
@@ -1012,16 +1135,16 @@ class QuantumAlgorithms:
             QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c)
             QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
             
-            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,reverse=True)
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,inverse=True)
             q.CNOT(wires=[wires_b[-1],wires_t])
             QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c)
         else:
-            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,reverse=True)
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,inverse=True)
             q.CNOT(wires=[wires_b[-1],wires_t])
             QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c)
             
             QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
-            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c,reverse=True)
+            QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c,inverse=True)
             QuantumGates.Controlled_reset_zero_register_to_N(self,control_wire=wires_t,wires_zero_register=wires_N,N=N)
             
             q.PauliX(wires=wires_b[-1])
@@ -1029,26 +1152,145 @@ class QuantumAlgorithms:
             q.PauliX(wires=wires_b[-1])
             
             QuantumAlgorithms.ADDER(self,wires_N,wires_b,wires_c)
-            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,reverse=True)
+            QuantumAlgorithms.ADDER(self,wires_a,wires_b,wires_c,inverse=True)
     
     
-    # Implements |a,b> -> |a,a+b mod N> for binary representation of a and b
-    # If reverse == True, implements |a,b> -> |a,b-a mod N> for binary representation of a and b
-    # setup: algorithm uses 5 registers - register with prepared a, register with prepared b, register with prpared N and register t with auxiliary |0>
+    # Implements |0,z,0> -> |0,z,z> and |1,z,0> -> |1,z,zy mod N> for binary representation of z and y
+    # y and N are classically known
+    # If inverse == True, implements ???
+    # setup: algorithm uses 7 registers - control register, register with prepared z, register with prepared |0..0> for input a into ADDER_MODs, register with prepared |0..0> for input b into ADDER_MODs, register with prepared |0..0> for input c into ADDER_MODs, register with prpared N and register t with auxiliary |0>
+    # 1 wire for the control register (control_wire)
+    # n wires for the register with z (wires_z)
     # n wires for the register with a (wires_a)
     # n+1 wires for the register with b (wires_b)
-    # n wires for the register with c (wires_c)
+    # n wires for the register with |0..0> (wires_c)
     # n wires for the register with N (wires_N)
-    # n wires for the register with |0...0> (wires_swap_0)
     # 1 wire for the register with t=|0> (wires_t)
-    # Note that it works correctly only for 0 <= a,b < N
-    # Note that it seems like register t might be equal to |1> for a,b and N which are not 0 <= a,b < N
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
-#     def Controlled_MULT_MOD(self,wires_a,wires_b,wires_c,wires_N,wires_swap_0,wires_t,reverse=False):
+    def Controlled_MULT_MOD(self,control_wire,wires_z,wires_a,wires_b,wires_c,wires_N,wires_t,N,m,inverse=False):
         
+        n = len(wires_z)
         
+        # check N and m
+        # format of N and m
+        if isinstance(N, q.variable.Variable):
+            N = N.val
+        if isinstance(m, q.variable.Variable):
+            m = m.val
+        # check if N does not match the size of wires_N
+        if N > 2**(len(wires_N))-1:
+            raise Exception('N is too big for the register wires_N')
         
+        # check control inputs
+        if (isinstance(control_wire, list)):
+            raise Exception('control_wire should not be a list')
+        if (isinstance(wires_t, list)):
+            raise Exception('wires_t should not be a list')
+        
+        # check wires
+        if ( (len(wires_a) == n)&(len(wires_b) == n+1)&(len(wires_c) == n)&(len(wires_N) == n) == False):
+            raise Exception('Wrong size of registers - it should be: \n 1 wire for the control register (control_wire) \n n wires for the register with z (wires_z) \n n wires for the register with a (wires_a) \n n+1 wires for the register with b (wires_b) \n n wires for the register with |0..0> (wires_c) \n n wires for the register with N (wires_N) \n 1 wire for the register with t=|0> (wires_t)')
+            
+        
+        # circuit
+        if inverse == False:
+            ### block with ADDER_MODs
+            # cycle to iteratively add ADDER_MODs each surrounded by Toffoli gates with control1=control_wire, control2=wires_z[i] and target - wire in wires_a, for which m*2^i == '1'
+            for i in range(len(wires_z)):
+                # binary representation of m*2^i mod N
+                m_2_to_power_i_mod_N = bin((m*(2**i)) % N)[2:][::-1]
+                m_2_to_power_i_mod_N = m_2_to_power_i_mod_N + '0'*( len(wires_a)-len(m_2_to_power_i_mod_N) )
+                
+                # cycle for Toffoli gates before ADDER_MOD to put m*2^i to wires_a if control_wire == 1
+                for j in range(len(wires_a)):
+                    if m_2_to_power_i_mod_N[j] == '1':
+                        QuantumGates.Toffoli(self,wires=[control_wire,wires_z[i],wires_a[j]])
+
+                # ADDER_MOD[i]
+                QuantumAlgorithms.ADDER_MOD(self,wires_a=wires_a,wires_b=wires_b,wires_c=wires_c,wires_N=wires_N,wires_t=wires_t,N=N)
+
+                # cycle for Toffoli gates after ADDER_MOD to make wires_a |0..0> if control_wire == 1
+                for j in range(len(wires_a)):
+                    if m_2_to_power_i_mod_N[j] == '1':
+                        QuantumGates.Toffoli(self,wires=[control_wire,wires_z[i],wires_a[j]])
+
+            ### block for copying z into wires_a conditional on control_wire == |0>. That is, we want |0,z,0> -> |0,z,z>
+            q.PauliX(wires=control_wire)
+            for i in range(len(wires_z)):
+                QuantumGates.Toffoli(self,wires=[control_wire,wires_z[i],wires_a[i]])
+            q.PauliX(wires=control_wire)
+        
+        else:
+            ### block for copying z into wires_a conditional on control_wire == |0>
+            q.PauliX(wires=control_wire)
+            for i in range(len(wires_z)):
+                QuantumGates.Toffoli(self,wires=[control_wire,wires_z[i],wires_a[i]])
+            q.PauliX(wires=control_wire)
+            
+            for i in range(len(wires_z)-1,-1,-1):
+                # binary representation of m*2^i mod N
+                m_2_to_power_i_mod_N = bin((m*(2**i)) % N)[2:][::-1]
+                m_2_to_power_i_mod_N = m_2_to_power_i_mod_N + '0'*( len(wires_a)-len(m_2_to_power_i_mod_N) )
+                
+                # cycle for Toffoli gates after ADDER_MOD to make wires_a |0..0> if control_wire == 1
+                for j in range(len(wires_a)):
+                    if m_2_to_power_i_mod_N[j] == '1':
+                        QuantumGates.Toffoli(self,wires=[control_wire,wires_z[i],wires_a[j]])
+                
+                # ADDER_MOD[i]
+                QuantumAlgorithms.ADDER_MOD(self,wires_a=wires_a,wires_b=wires_b,wires_c=wires_c,wires_N=wires_N,wires_t=wires_t,N=N,inverse=True)
+                
+                # cycle for Toffoli gates before ADDER_MOD to put m*2^i to wires_a if control_wire == 1
+                for j in range(len(wires_a)):
+                    if m_2_to_power_i_mod_N[j] == '1':
+                        QuantumGates.Toffoli(self,wires=[control_wire,wires_z[i],wires_a[j]])
     
+    
+    # Implements |x,1> -> |x,y^x mod N>
+    # y and N are classically known
+    # If inverse == True, implements ???
+    # setup: algorithm uses 7 registers - registerwith prepared x, register with prepared 1 for input z into ADDER_MODs, register with prepared |0..0> for input a into ADDER_MODs, register with prepared |0..0> for input b into ADDER_MODs, register with prepared |0..0> for input c into ADDER_MODs, register with prpared N and register t with auxiliary |0>
+    # up to 2n wires for the register with x (wires_x)
+    # n wires for the register with z (wires_z)
+    # n wires for the register with |0..0> (wires_a)
+    # n+1 wires for the register with |0..0> (wires_b)
+    # n wires for the register with |0..0> (wires_c)
+    # n wires for the register with N (wires_N)
+    # 1 wire for the register with t=|0> (wires_t)
+    # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
+    def MODULAR_EXPONENTIATION(self,wires_x,wires_z,wires_a,wires_b,wires_c,wires_N,wires_t,N,y,inverse=False):
+        
+        n = len(wires_z)
+        
+        # check N and m
+        # format of N and m
+        if isinstance(N, q.variable.Variable):
+            N = N.val
+        if isinstance(y, q.variable.Variable):
+            y = y.val
+        # check if N does not match the size of wires_N
+        if N > 2**(len(wires_N))-1:
+            raise Exception('N is too big for the register wires_N')
+        
+        # check control inputs
+        if (isinstance(wires_t, list)):
+            raise Exception('wires_t should not be a list')
+        
+        # check wires
+        if ( (len(wires_z) <= 2*n)&(len(wires_a) == n)&(len(wires_b) == n+1)&(len(wires_c) == n)&(len(wires_N) == n) == False):
+            raise Exception('Wrong size of registers - it should be: \n <= 2n wires for the register with x (wires_x) \n n wires for the register with z (wires_z) \n n wires for the register with a (wires_a) \n n+1 wires for the register with b (wires_b) \n n wires for the register with |0..0> (wires_c) \n n wires for the register with N (wires_N) \n 1 wire for the register with t=|0> (wires_t)')
+        
+        
+        # circuit
+        
+        for i in range(len(wires_x)):
+            QuantumAlgorithms.Controlled_MULT_MOD(self,control_wire=wires_x[i],wires_z=wires_z,wires_a=wires_a,wires_b=wires_b,wires_c=wires_c,wires_N=wires_N,wires_t=wires_t,N=N,m=y**(2**i))
+            # SWAP register wires_z with wires_b[:-1]
+            for j in range(len(wires_z)):
+                QuantumGates.Controlled_SWAP(self,control_wire=wires_x[i],swap_wires=[wires_z[j],wires_b[j]])
+            # find modular multiplicative inverse of y**(2**i)
+            inverse_y_2_i = ClassicalOperations.modular_multiplicative_inverse(self,a=y**(2**i),N=N)
+            QuantumAlgorithms.Controlled_MULT_MOD(self,control_wire=wires_x[i],wires_z=wires_z,wires_a=wires_a,wires_b=wires_b,wires_c=wires_c,wires_N=wires_N,wires_t=wires_t,N=N,m=inverse_y_2_i,inverse=True)
     
     
     # Implements Quantum Fourier transform. 
