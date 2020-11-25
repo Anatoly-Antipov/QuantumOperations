@@ -187,7 +187,7 @@ class ClassicalOperations:
     
     
     # 2x2 matrix to the custom power
-    def matrix_power(self, U, power=1/2):
+    def matrix_power(self,U,power=1/2):
         
         if U.shape[0] != 2:
             raise Exception('U should be of size 2x2')
@@ -238,7 +238,7 @@ class ClassicalOperations:
     
     
     # Given 2x2 matrix, function returns angles of ZY decomposition
-    def ZY_decomposition_angles(self, U):
+    def ZY_decomposition_angles(self,U):
         
         if U.shape[0] != 2:
             raise Exception('U should be of size 2x2')
@@ -295,7 +295,7 @@ class ClassicalOperations:
         return {'alpha':alpha, 'beta':beta, 'delta':delta, 'gamma':gamma}
     
     # Given angles of ZY decomposition, function returns corresponding 2x2 matrix
-    def U_given_ZY_angles(self, alpha, beta, gamma, delta):
+    def U_given_ZY_angles(self,alpha,beta,gamma,delta):
         
         # if angles are passed as pennylane.Variable, then use proper format
         if isinstance(alpha, q.variable.Variable):
@@ -493,7 +493,7 @@ class QuantumGates:
             q.CNOT(wires=[wires[1],wires[2]])
             QuantumGates.Toffoli(self,wires=wires[1:])
     
-    # Implements 3-wires carry operation used for ADDER
+    # Implements 3-wires sum operation used for ADDER
     # setup: wires[0] = a, wires[1] = b, wires[2] = |0>
     # operation makes wires[2] = a+b mod 2
     # Based on Vedral, Barenco, Ekert - "Quantum Networks for Elementary Arithmetic Operations", 1996
@@ -568,7 +568,7 @@ class QuantumGates:
             q.PhaseShift(np.pi/(2**k),wires=control_wire)
     
     
-    # Implements C_n_U given arbitrary U for arbitrary amount of control wires (up to n=5)
+    # Implements C_n_U given arbitrary 2x2 U and arbitrary amount of control wires (up to n=5)
     def C_U(self,U,control_wires,operation_wire):
         
         if U.shape[0] != 2:
@@ -1014,27 +1014,7 @@ class QuantumGates:
         for i in range(len(gray_code)-3,-1,-1):
             QuantumGates.gray_code_C_X(self,gray_code[i],changing_bit[i],wires)
     
-    
-    # controlled n-qubit unitary U (one control wire, n operation wires)
-    def C_U_n(self, U, control_wire, operation_wires):
-        
-        # check dimensionality of U
-        if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
-            raise Exception('Wrong shape of U: it should be 2**len(operation_wires)')
-        
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
-        
-        # get Two_level_U_list and non_trivial_indices of any matrix in the list
-        Two_level_U_list = ClassicalOperations.Two_level_unitary_decomposition(self,U)
-        decomposition_pairs_list = ClassicalOperations.get_non_trivial_indices(self,Two_level_U_list)
-        
-        # consequentially execute controlled_Two_level_Us
-        # note that circuits should be in reverse order relative to matrix decomposition
-        for decomposition_pair in reversed(decomposition_pairs_list):
-            # execute controlled_Two_level_U
-            QuantumGates.controlled_Two_level_U(self,U=decomposition_pair[0],non_trivial_indices=decomposition_pair[1],control_wire=control_wire,operation_wires=operation_wires)
-    
+
 #-------------------------------------------------#
 #--- Functions implementing quantum algorithms ---#
 #-------------------------------------------------#
@@ -1043,7 +1023,7 @@ class QuantumAlgorithms:
     
     
     # Arbitrary U circuit
-    def U_n(self, U, wires):
+    def U_n(self,U,wires):
         
         # check dimensionality of U
         if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
@@ -1061,6 +1041,27 @@ class QuantumAlgorithms:
         for decomposition_pair in reversed(decomposition_pairs_list):
             # execute Two_level_U
             QuantumGates.Two_level_U(self,wires=wires,U=decomposition_pair[0],non_trivial_indices=decomposition_pair[1])
+    
+    
+    # controlled n-qubit unitary U (one control wire, n operation wires)
+    def C_U_n(self,U,control_wire,operation_wires):
+        
+        # check dimensionality of U
+        if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
+            raise Exception('Wrong shape of U: it should be 2**len(operation_wires)')
+        
+        ### Transform U
+        U = ClassicalOperations.check_matrix(self,U)
+        
+        # get Two_level_U_list and non_trivial_indices of any matrix in the list
+        Two_level_U_list = ClassicalOperations.Two_level_unitary_decomposition(self,U)
+        decomposition_pairs_list = ClassicalOperations.get_non_trivial_indices(self,Two_level_U_list)
+        
+        # consequentially execute controlled_Two_level_Us
+        # note that circuits should be in reverse order relative to matrix decomposition
+        for decomposition_pair in reversed(decomposition_pairs_list):
+            # execute controlled_Two_level_U
+            QuantumGates.controlled_Two_level_U(self,U=decomposition_pair[0],non_trivial_indices=decomposition_pair[1],control_wire=control_wire,operation_wires=operation_wires)
     
     
     # Implements |a,b> -> |a,a+b> for binary representation of a and b
@@ -1319,7 +1320,7 @@ class QuantumAlgorithms:
         for i in range(t):
             q.Hadamard(wires=wires[i])
         for i in range(t):
-            QuantumGates.C_U_n(self,ClassicalOperations.matrix_natural_power(self,U,power=2**i),control_wire=wires[(t-1)-i],operation_wires=wires[t:])
+            QuantumAlgorithms.C_U_n(self,ClassicalOperations.matrix_natural_power(self,U,power=2**i),control_wire=wires[(t-1)-i],operation_wires=wires[t:])
         
         # 3. Apply inverse Quantum Fourier transform to the first register
         QuantumAlgorithms.QFT(self,wires=wires[:t],inverse=True)
