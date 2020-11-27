@@ -32,7 +32,7 @@ class ClassicalOperations:
     
     # returns np.array with bitwise binary representation of a given number
     # if option reverse=True reverses array so that the first bit is for 2^0 and the last is for 2^(k-1)
-    # if option bits is set to a number, then the length of resulting array is bits.
+    # if option bits is set to a number, then the length of resulting array is bits
     def int_to_binary_array(self,n,reverse=False,bits=False):
         if bits == False:
             if reverse == False:
@@ -107,7 +107,6 @@ class ClassicalOperations:
     
     
     # Auxiliary recursive function for finding alpha and beta in r_n = alpha*a + beta*b, where n: r_n = gcd(a,b)
-    # algorithm should be initialized with alpha = 1, beta = -k_(n-2), i = n-2
     # before algorithms' execution, array of k should be defined
     # i denotes level in Euclid's algorithm
     # algorithm should be initialized with alpha = 1, beta = -k_(n-2), i = n-2, where n: r_n = gcd(a,b)
