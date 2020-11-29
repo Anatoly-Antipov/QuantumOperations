@@ -1310,6 +1310,7 @@ class QuantumAlgorithms:
             QuantumGates.SWAP(self,[wires[i],wires[len(wires)-(i+1)]])
     
     
+    # General inefficient Phase estimation
     def Phase_Estimation(self,U,t,wires):
         
         # 1. Prepare initial state
@@ -1326,6 +1327,23 @@ class QuantumAlgorithms:
         
         # 4. Measure the first register
         # measurements should be performed in QNode environment
+    
+    
+    # O(n^3) efficient order-finding circuit
+    def Order_Finding(self,wires,wires_x,wires_z,wires_a,wires_b,wires_c,wires_N,wires_t,t,N,y):
         
+        # 1. Prepare initial state
+        # preparation should be performed in QNode environment
         
+        # 2. Create superposition with Hadamard gates and modular exponentiation block
+        # Hadamard gates
+        for i in range(t):
+            q.Hadamard(wires=wires[i])
+        QuantumAlgorithms.MODULAR_EXPONENTIATION(self,wires_x,wires_z,wires_a,wires_b,wires_c,wires_N,wires_t,N,y)
+        
+        # 3. Apply inverse Quantum Fourier transform to the first register
+        QuantumAlgorithms.QFT(self,wires=wires[:t],inverse=True)
+        
+        # 4. Measure the first register
+        # measurements should be performed in QNode environment
         
