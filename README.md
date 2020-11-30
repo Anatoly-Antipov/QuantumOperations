@@ -6,3 +6,4 @@ Documentation alongside with overview and an example of usage of classes can be 
 Tests for some operations from different classes are provided in Test.ipynb
 
 Folder "Schemes" contains illustrations for documentation
+To view Documentation.ipynb with schemes, please download QuantumOperations folder and rerun Documentation.ipynb in Jupyter Notebook
