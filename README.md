@@ -1,5 +1,5 @@
 # QuantumOperations
-Contains implementations of various quantum gates and well-known quantum algorithms
+Contains implementations of various quantum gates and well-known quantum algorithms using pennylane library
 
 The main file containing all the classes and functions is called "QuantumOperations.py".
 Documentation alongside with overview and an example of usage of classes can be found in the file Documentation.pdf.
