@@ -10,18 +10,6 @@ import copy
 
 class ClassicalOperations:
     
-    # checks if matrix U is in pennylane.Variable format and makes U proper format if necessary
-    def check_matrix(self,U):
-        # if U is passed as pennylane.Variable, then use type np.complex128
-        if isinstance(U[0][0], q.variable.Variable):
-            # no straight-forward't matrix-wise operation .val for ndarray of pennylane.Variables => use cycle
-            for i in range(U.shape[0]):
-                for j in range(U.shape[0]):
-                    U[i][j] = U[i][j].val
-            # after the cycle, U has dtype = object. Replace it with dtype = complex128
-            U = U.astype(dtype = 'complex128')
-        return U
-    
     # prints out list of states in a computational basis
     def states_vector(self,wires):
         states_vector = list()
@@ -87,16 +75,10 @@ class ClassicalOperations:
     # Euclid's algorithm - finds greater common devider
     # Note: doesn't work correctly for too big numbers (because a%b and int(a/b) do not work)
     def gcd(self,a,b):
-        ## check
-        # format
-        if isinstance(a, q.variable.Variable):
-            a = a.val# format
-        if isinstance(b, q.variable.Variable):
-            b = b.val
-        # order
+        
+        ## check order
         if a < b:
             a,b = b,a
-        
         
         ## algorithm
         r = a%b
@@ -123,13 +105,7 @@ class ClassicalOperations:
     # Euclid's algorithm produces set of values (k_i,r_i), where r_i = k_i*r_(i+1) + r_(i+2), i goes from 0 to n
     def diophantine_equation(self,a,b):
         
-        ## check
-        # format
-        if isinstance(a, q.variable.Variable):
-            a = a.val# format
-        if isinstance(b, q.variable.Variable):
-            b = b.val
-        # order
+        ## check order
         flag = 0
         if a < b:
             a,b = b,a
@@ -162,13 +138,7 @@ class ClassicalOperations:
     # finds modular multiplicative inverse using diophantine_equation
     def modular_multiplicative_inverse(self,a,N):
         
-        ## check
-        # format
-        if isinstance(a, q.variable.Variable):
-            a = a.val# format
-        if isinstance(N, q.variable.Variable):
-            N = N.val
-        # co-primality
+        ## check co-primality
         if ClassicalOperations.gcd(self,a,N) != 1:
             raise Exception('a and N should be co-prime, i.e. gcd(a,N) should be 1')
 #         if a >= N:
@@ -190,13 +160,6 @@ class ClassicalOperations:
         
         if U.shape[0] != 2:
             raise Exception('U should be of size 2x2')
-        
-        ### Transform U and power
-        U = ClassicalOperations.check_matrix(self,U)
-        # if power is passed as pennylane.Variable, then use type np.complex128
-        if isinstance(power, q.variable.Variable):
-            power = power.val
-        
         
         # get eigenvectors and eigenvalues
         e = Matrix(U).eigenvects()
@@ -241,9 +204,6 @@ class ClassicalOperations:
         
         if U.shape[0] != 2:
             raise Exception('U should be of size 2x2')
-        
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
         
         ### Computations
         # if U doesn't contain 0's, then apply general method
@@ -296,16 +256,6 @@ class ClassicalOperations:
     # Given angles of ZY decomposition, function returns corresponding 2x2 matrix
     def U_given_ZY_angles(self,alpha,beta,gamma,delta):
         
-        # if angles are passed as pennylane.Variable, then use proper format
-        if isinstance(alpha, q.variable.Variable):
-            alpha = alpha.val
-        if isinstance(beta, q.variable.Variable):
-            beta = beta.val
-        if isinstance(gamma, q.variable.Variable):
-            gamma = gamma.val
-        if isinstance(delta, q.variable.Variable):
-            delta = delta.val
-        
         RZ_beta = np.array([[np.exp(-1j*beta/2),0],
                             [0,np.exp(1j*beta/2)]])
         RY_gamma = np.array([[np.cos(gamma/2),-np.sin(gamma/2)],
@@ -318,9 +268,6 @@ class ClassicalOperations:
     # Given U, function returns its two-level unitary decomposition
     # Note that U = decomposition_list[0]*...*decomposition_list[n-1]
     def Two_level_unitary_decomposition(self,U):
-        
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
         
         if U.shape[0] == 2:
             decomposition_list = list([U])
@@ -455,10 +402,6 @@ class QuantumGates:
     # if control == 1, then resulting values in the wires_zero_register are [N_0, N_1, ... , N_(n-1)], where N = N_(n-1)*2^(n-1) + ... + N_1*2^1 + N_0*2^0
     def Controlled_reset_zero_register_to_N(self,control_wire,wires_zero_register,N):
         
-        # check N
-        # format
-        if isinstance(N, q.variable.Variable):
-            N = N.val
         # check if N does not match the size of wires_zero_register
         if N > 2**(len(wires_zero_register))-1:
             raise Exception('N is too big for the register wires_zero_register')
@@ -509,20 +452,6 @@ class QuantumGates:
     # Implements controlled-U given angles from ZY-decomposition of U
     def Controlled_U_block(self,alpha,beta,gamma,delta,delta_plus_beta,delta_minus_beta,wires):
         
-        # if variables are passed as pennylane.Variable, then use proper format
-        if isinstance(alpha, q.variable.Variable):
-            alpha = alpha.val
-        if isinstance(beta, q.variable.Variable):
-            beta = beta.val
-        if isinstance(gamma, q.variable.Variable):
-            gamma = gamma.val
-        if isinstance(delta, q.variable.Variable):
-            delta = delta.val
-        if isinstance(delta_plus_beta, q.variable.Variable):
-            delta_plus_beta = delta_plus_beta.val
-        if isinstance(delta_minus_beta, q.variable.Variable):
-            delta_minus_beta = delta_minus_beta.val
-        
         q.RZ((delta_minus_beta)/2,wires=wires[1])
         q.CNOT(wires=[wires[0],wires[1]])
         q.RZ(-(delta_plus_beta)/2,wires=wires[1])
@@ -545,9 +474,6 @@ class QuantumGates:
         
         # for further optimization: note that RZ(pi/(2**(k-1))) and PhaseShift(pi/(2**k)) could be effectively translated into elementary blocks
         
-        # if k is passed as pennylane.Variable, then use proper format
-        if isinstance(k, q.variable.Variable):
-            k = k.val
         # check domain of k
         if (k != int(k)) | (k < 1):
             raise Exception('k should be a natural number')
@@ -572,9 +498,6 @@ class QuantumGates:
         
         if U.shape[0] != 2:
             raise Exception('U should be of size 2x2')
-        
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
         
         # C_1_U
         if len(control_wires) == 1:
@@ -894,9 +817,6 @@ class QuantumGates:
 
     def gray_code_C_X(self,gray_code_element,changing_bit,wires):
         
-        # if changing_bit is passed as pennylane.Variable, then use proper format
-        if isinstance(changing_bit, q.variable.Variable):
-            changing_bit = int(changing_bit.val)
         # wires and gray_code_element cannot be passed properly as an argument to QNode's function
         
         # U = X
@@ -922,15 +842,9 @@ class QuantumGates:
     
     # Implements Two_level_U given angles from ZY decomposition of U. building block for function U_n
     def Two_level_U(self,U,non_trivial_indices,wires):
-        
-        ### Transform U and non_trivial_indices
-        U = ClassicalOperations.check_matrix(self,U)
         # non_trivial_indices should be list (otherwise, error is raised while executing U[np.ix_...])
         if isinstance(non_trivial_indices, list) == False:
             non_trivial_indices = list(non_trivial_indices)
-        for i in range(len(non_trivial_indices)):
-            if isinstance(non_trivial_indices[i], q.variable.Variable):
-                non_trivial_indices[i] = int(non_trivial_indices[i].val)
         
         print(non_trivial_indices, end="\r")
         U_non_trivial_submatrix = U[np.ix_(non_trivial_indices,non_trivial_indices)]
@@ -967,14 +881,9 @@ class QuantumGates:
     # Implements Two_level_U given angles from ZY decomposition of U. Building block for function C_U_n
     def controlled_Two_level_U(self,U,non_trivial_indices,control_wire,operation_wires):
         
-        ### Transform U and non_trivial_indices
-        U = ClassicalOperations.check_matrix(self,U)
         # non_trivial_indices should be list (otherwise, error is raised while executing U[np.ix_...])
         if isinstance(non_trivial_indices, list) == False:
             non_trivial_indices = list(non_trivial_indices)
-        for i in range(len(non_trivial_indices)):
-            if isinstance(non_trivial_indices[i], q.variable.Variable):
-                non_trivial_indices[i] = int(non_trivial_indices[i].val)
         
         print(non_trivial_indices, end="\r")
         U_non_trivial_submatrix = U[np.ix_(non_trivial_indices,non_trivial_indices)]
@@ -1028,9 +937,6 @@ class QuantumAlgorithms:
         if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
             raise Exception('Wrong shape of U: it should be 2**len(wires)')
         
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
-        
         # get Two_level_U_list and non_trivial_indices of any matrix in the list
         Two_level_U_list = ClassicalOperations.Two_level_unitary_decomposition(self,U)
         decomposition_pairs_list = ClassicalOperations.get_non_trivial_indices(self,Two_level_U_list)
@@ -1048,9 +954,6 @@ class QuantumAlgorithms:
         # check dimensionality of U
         if int(np.log2(U.shape[0])) != np.log2(U.shape[0]):
             raise Exception('Wrong shape of U: it should be 2**len(operation_wires)')
-        
-        ### Transform U
-        U = ClassicalOperations.check_matrix(self,U)
         
         # get Two_level_U_list and non_trivial_indices of any matrix in the list
         Two_level_U_list = ClassicalOperations.Two_level_unitary_decomposition(self,U)
@@ -1172,12 +1075,7 @@ class QuantumAlgorithms:
         
         n = len(wires_z)
         
-        # check N and m
-        # format of N and m
-        if isinstance(N, q.variable.Variable):
-            N = N.val
-        if isinstance(m, q.variable.Variable):
-            m = m.val
+        # check N
         # check if N does not match the size of wires_N
         if N > 2**(len(wires_N))-1:
             raise Exception('N is too big for the register wires_N')
@@ -1263,12 +1161,11 @@ class QuantumAlgorithms:
         
         n = len(wires_z)
         
-        # check N and m
-        # format of N and m
-        if isinstance(N, q.variable.Variable):
-            N = N.val
-        if isinstance(y, q.variable.Variable):
-            y = y.val
+        # if type of N and y is 'pennylane.numpy.tensor.tensor', then transform N and y to int (otherwise, there are problems with big numbers)
+        N = int(N)
+        y = int(y)
+        
+        # check N
         # check if N does not match the size of wires_N
         if N > 2**(len(wires_N))-1:
             raise Exception('N is too big for the register wires_N')
