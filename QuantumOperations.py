@@ -354,9 +354,9 @@ class Ctrl_SWAP(Operation):
         control_wire = self.wires[0]
         
         with qml.tape.QuantumTape() as tape:
-            qml.Toffoli(wires=[self.wires[0],self.wires[1],self.wires[2]])
+            qml.CNOT(wires=[self.wires[1],self.wires[2]])
             qml.Toffoli(wires=[self.wires[0],self.wires[2],self.wires[1]])
-            qml.Toffoli(wires=[self.wires[0],self.wires[1],self.wires[2]])
+            qml.CNOT(wires=[self.wires[1],self.wires[2]])
         return tape
 
 # input parameters: N,y
