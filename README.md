@@ -3,12 +3,10 @@ This package is developed for the efficient realization of the quantum part of S
 
 Files description:
 
-1. **QuantumOperations.py** contains a set of quantum gates and algorithms. Any quantum gate or algorithm is realized as a subclass of the PennyLane's Operation class.
+1. **QuantumOperations.py** contains a set of quantum gates and algorithms. Any quantum gate or algorithm is realized as a subclass of the PennyLane's Operation class
 
-2. **ClassicalOperations.py** contains a class of auxiliary classical functions supporting quantum computations.
+2. **ClassicalOperations.py** contains a class of auxiliary classical functions supporting quantum computations
 
 3. **Example.ipynb** - Jupyter notebook with an example of usage of the SUM gate from QuantumOperations.py
 
 4. **Test.ipynb** - Jupyter notebook with various tests of the realized quantum gates and algorithms
-
-Tests for some operations from different classes are provided in Test.ipynb.
