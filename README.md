@@ -9,4 +9,6 @@ Files description:
 
 3. **Example.ipynb** - Jupyter notebook with an example of usage of the SUM gate from QuantumOperations.py
 
-4. **Test.ipynb** - Jupyter notebook with various tests of the realized quantum gates and algorithms
+4. **ExampleOrderFinding.ipynb** - Jupyter notebook with an example of usage of the OrderFinding gate from QuantumOperations.py
+
+5. **Test.ipynb** - Jupyter notebook with various tests of the realized quantum gates and algorithms

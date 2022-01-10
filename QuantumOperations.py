@@ -362,26 +362,27 @@ class Ctrl_SWAP(Operation):
 # input parameters: N,y
 class MODULAR_EXPONENTIATION(Operation):
 
-    num_params = 2
+    num_params = 3
     num_wires = AnyWires
     par_domain = None
 
     def expand(self):
         
         # check wires
-        if (len(self.wires)-2)%6 !=0 or len(self.wires) < 8:
-            raise Exception('Wrong size of registers - it should be: \n n wires for the register with x (wires_x) \n n wires for the register with z (wires_z) \n n wires for the register with a (wires_a) \n n+1 wires for the register with b (wires_b) \n n wires for the register with |0..0> (wires_c) \n n wires for the register with N (wires_N) \n 1 wire for the register with t=|0> (wires_t)')
+        n_x = int(self.parameters[2])
+        if (len(self.wires)-2-n_x)%5 != 0:
+            raise Exception('Wrong size of registers - it should be: \n n_x wires for the register with x (wires_x) \n n wires for the register with z (wires_z) \n n wires for the register with a (wires_a) \n n+1 wires for the register with b (wires_b) \n n wires for the register with |0..0> (wires_c) \n n wires for the register with N (wires_N) \n 1 wire for the register with t=|0> (wires_t)')
         else:
-            n = int((len(self.wires)-2)/6)
-            wires_x = self.wires[0:n]
-            wires_z = self.wires[n:2*n]
-            wires_a = self.wires[2*n:3*n]
-            wires_b = self.wires[3*n:4*n+1]
-            wires_c = self.wires[4*n+1:5*n+1]
-            wires_N = self.wires[5*n+1:6*n+1]
-            wires_t = self.wires[-1]
+            n = int((len(self.wires)-2-n_x)/5)
             N = int(self.parameters[0])
             y = int(self.parameters[1])
+            wires_x = self.wires[0:n_x]
+            wires_z = self.wires[n_x:n_x+n]
+            wires_a = self.wires[n_x+n:n_x+2*n]
+            wires_b = self.wires[n_x+2*n:n_x+3*n+1]
+            wires_c = self.wires[n_x+3*n+1:n_x+4*n+1]
+            wires_N = self.wires[n_x+4*n+1:n_x+5*n+1]
+            wires_t = self.wires[-1]
         
         # check inputs
         # check N
@@ -390,7 +391,7 @@ class MODULAR_EXPONENTIATION(Operation):
             raise Exception('N is too big for the register wires_N')
         
         with qml.tape.QuantumTape() as tape:
-        
+            
             for i in range(len(wires_x)):
                 Ctrl_MULT_MOD(N,y**(2**i),wires=[wires_x[i]]+wires_z+wires_a+wires_b+wires_c+wires_N+[wires_t])
                 # SWAP register wires_z with wires_b[:-1]
@@ -481,25 +482,26 @@ class QFT_inv(Operation):
 # input parameters: N,y
 class Order_Finding(Operation):
 
-    num_params = 2
+    num_params = 3
     num_wires = AnyWires
     par_domain = None
 
     def expand(self):
         
         # check wires and define registers
-        if (len(self.wires)-2)%6 !=0 or len(self.wires) < 8:
-            raise Exception('Wrong size of registers - it should be: \n n wires for the register with x (wires_x) \n n wires for the register with z (wires_z) \n n wires for the register with a (wires_a) \n n+1 wires for the register with b (wires_b) \n n wires for the register with |0..0> (wires_c) \n n wires for the register with N (wires_N) \n 1 wire for the register with t=|0> (wires_t)')
+        n_x = int(self.parameters[2])
+        if (len(self.wires)-2-n_x)%5 != 0:
+            raise Exception('Wrong size of registers - it should be: \n n_x wires for the register with x (wires_x) \n n wires for the register with z (wires_z) \n n wires for the register with a (wires_a) \n n+1 wires for the register with b (wires_b) \n n wires for the register with |0..0> (wires_c) \n n wires for the register with N (wires_N) \n 1 wire for the register with t=|0> (wires_t)')
         else:
             N = int(self.parameters[0])
             y = int(self.parameters[1])
-            n = int((len(self.wires)-2)/6)
-            wires_x = self.wires[:n]
-            wires_z = self.wires[n:2*n]
-            wires_a = self.wires[2*n:3*n]
-            wires_b = self.wires[3*n:4*n+1]
-            wires_c = self.wires[4*n+1:5*n+1]
-            wires_N = self.wires[5*n+1:6*n+1]
+            n = int((len(self.wires)-2-n_x)/5)
+            wires_x = self.wires[0:n_x]
+            wires_z = self.wires[n_x:n_x+n]
+            wires_a = self.wires[n_x+n:n_x+2*n]
+            wires_b = self.wires[n_x+2*n:n_x+3*n+1]
+            wires_c = self.wires[n_x+3*n+1:n_x+4*n+1]
+            wires_N = self.wires[n_x+4*n+1:n_x+5*n+1]
             wires_t = self.wires[-1]
         
         # check inputs
@@ -511,11 +513,11 @@ class Order_Finding(Operation):
         with qml.tape.QuantumTape() as tape:
 
             # Create superposition with Hadamard gates 
-            for i in range(n):
+            for i in range(len(wires_x)):
                 qml.Hadamard(wires=wires_x[i])
 
             # Apply modular exponentiation
-            MODULAR_EXPONENTIATION(N,y,wires=wires_x+wires_z+wires_a+wires_b+wires_c+wires_N+[wires_t])
+            MODULAR_EXPONENTIATION(N,y,n_x,wires=wires_x+wires_z+wires_a+wires_b+wires_c+wires_N+[wires_t])
 
             # Apply inverse Quantum Fourier transform to the first register
             QFT_inv(wires=wires_x)
