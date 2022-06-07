@@ -70,7 +70,7 @@ class ClassicalOperations:
         # forward part of the algorithm (Nielsen Chuang p.628)
         while b!=0:
             r_list.append(b)
-            k_list.append(int(a/b))
+            k_list.append(a//b)
             a,b = b,a%b
         
         # backward part of the algorithm (Nielsen Chuang p. 629)

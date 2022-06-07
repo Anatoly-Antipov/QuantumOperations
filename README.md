@@ -7,8 +7,14 @@ Files description:
 
 2. **ClassicalOperations.py** contains a class of auxiliary classical functions supporting quantum computations
 
-3. **Example.ipynb** - Jupyter notebook with an example of usage of the SUM gate from QuantumOperations.py
+3. **Decomposer.py** contains functions for transpilation in accordance with simplified protocol from ‘Basic circuit compilation techniques for an ion-trap quantum machine’ - Maslov, 2017
 
-4. **ExampleOrderFinding.ipynb** - Jupyter notebook with an example of usage of the OrderFinding gate from QuantumOperations.py
+4. **Example.ipynb** - Jupyter notebook with an example of usage of the SUM gate from QuantumOperations.py
 
-5. **Test.ipynb** - Jupyter notebook with various tests of the realized quantum gates and algorithms
+5. **ExampleOrderFinding.ipynb** - Jupyter notebook with an example of usage of the OrderFinding gate from QuantumOperations.py
+
+6. **Test.ipynb** - Jupyter notebook with various tests of the realized quantum gates and algorithms
+
+7. **ExampleDecomposer.ipynb** - Jupyter notebook with a demo of decomposer
+
+8. **OrderFindingResourceAnalysis.ipynb** - Jupyter notebook with resource analysis for order finding using decomposer
