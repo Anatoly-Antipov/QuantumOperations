@@ -18,3 +18,5 @@ Files description:
 7. **ExampleDecomposer.ipynb** - Jupyter notebook with a demo of decomposer
 
 8. **OrderFindingResourceAnalysis.ipynb** - Jupyter notebook with resource analysis for order finding using decomposer
+
+NOTE: library was built using pennylane version 0.20.0
