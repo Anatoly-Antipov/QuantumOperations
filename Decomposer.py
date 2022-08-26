@@ -34,7 +34,7 @@ def decompose_to_qml(list_next_ops):
             # only QuantumOperations will be transpiled
             if type(op) in members_list:
 
-                for dec_op in op.decomposition(*op.parameters,wires=op.wires):
+                for dec_op in op.decomposition():
                     list_next_ops_.append(dec_op)
 
             else:
@@ -118,14 +118,14 @@ def decompose_single_qubit_operations(list_next_ops):
         if len(op.wires) == 1:
             
             # initialize variables before the next cycle
-            cumulative_block_operation = op.matrix
+            cumulative_block_operation = op.matrix()
             next_gate_index = find_next_gate(op.wires,list_next_ops)
             
             # while there are single-qubit operations to merge
             while (next_gate_index is not None) and (len(list_next_ops[next_gate_index].wires) == 1):
                 
                 # update cumulative_block_operation
-                cumulative_block_operation = list_next_ops[next_gate_index].matrix.dot(cumulative_block_operation)
+                cumulative_block_operation = list_next_ops[next_gate_index].matrix().dot(cumulative_block_operation)
                 
                 # exclude the merged gate from the list and update next_gate_index
                 list_next_ops.pop(next_gate_index)
@@ -134,8 +134,8 @@ def decompose_single_qubit_operations(list_next_ops):
             # when there are no more single-qubit operations to merge, translate the block into rotations
             decomposition_angles = decompose(cumulative_block_operation)
 #             op_list.append(q.R(*decomposition_angles, wires=op.wires))
-            op_list.append(q.R(decomposition_angles[3]/np.pi, decomposition_angles[2]/np.pi, 0, wires=op.wires))
-            op_list.append(q.R(decomposition_angles[1]/np.pi, decomposition_angles[0]/np.pi, 0, wires=op.wires))
+            op_list.append(q.R([decomposition_angles[3]/np.pi, decomposition_angles[2]/np.pi, 0], wires=op.wires))
+            op_list.append(q.R([decomposition_angles[1]/np.pi, decomposition_angles[0]/np.pi, 0], wires=op.wires))
             
         else:
             op_list.append(op)
